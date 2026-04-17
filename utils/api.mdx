@@ -1,0 +1,90 @@
+---
+title: "API utility — getUserInfo(token) and GET /users/me"
+description: "The api.jsx module exports getUserInfo(token), which fetches the authenticated user's profile from GET /users/me using a Bearer token."
+---
+
+`api.jsx` is the module responsible for communicating with the Cryptoducks backend after a user has authenticated. It exposes a single function, `getUserInfo`, that the `App` component calls on mount to verify whether a stored token is still valid and to populate the user's session data. Without this module, the app would have no way to restore a session across page reloads.
+
+## BASE_URL
+
+All requests in this module are relative to the shared base URL:
+
+```
+https://api.nomoreparties.co
+```
+
+## getUserInfo(token)
+
+Sends an authenticated `GET` request to `/users/me` and returns the user's profile data.
+
+```jsx api.jsx
+export const BASE_URL = "https://api.nomoreparties.co";
+
+export const getUserInfo = (token) => {
+  // Envía una solicitud GET a /users/me
+  return fetch(`${BASE_URL}/users/me`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      // Especifica un encabezado de autorización con un valor formateado
+      // adecuadamente.
+      Authorization: `Bearer ${token}`,
+    },
+  }).then((res) => {
+    return res.ok ? res.json() : Promise.reject(`Error: ${res.status}`);
+  });
+}
+```
+
+### Parameters
+
+<ParamField path="token" type="string" required>
+  The JWT retrieved from `localStorage`. Sent as the value of the `Authorization: Bearer` header.
+</ParamField>
+
+### Returns
+
+A `Promise` that resolves to the user's profile object on success, or rejects with the string `"Error: <status>"` when the server returns a non-`2xx` response.
+
+**Resolved shape:**
+
+| Field      | Type   | Description                   |
+| ---------- | ------ | ----------------------------- |
+| `username` | string | The user's display name.      |
+| `email`    | string | The user's email address.     |
+
+**Rejected value:**
+
+```
+"Error: 401"   // token invalid or expired
+"Error: 500"   // server error
+```
+
+## Usage in App.jsx
+
+`App` calls `getUserInfo` inside a `useEffect` that runs once on mount. If a JWT is found in `localStorage`, the app uses it to verify the session and restore the logged-in state without requiring the user to log in again:
+
+```jsx App.jsx
+useEffect(() => {
+  const jwt = getToken();
+
+  if (!jwt) {
+    return;
+  }
+
+  api
+    .getUserInfo(jwt)
+    .then(({ username, email }) => {
+      // si la respuesta es exitosa, inicia la sesión del usuario, guarda sus
+      // datos en el estado y lo dirige a /ducks.
+      setIsLoggedIn(true);
+      setUserData({ username, email });
+    })
+    .catch(console.error);
+}, []);
+```
+
+<Note>
+  The token passed to `getUserInfo` must be a valid, non-expired JWT. If the token is invalid or has expired, the API returns an HTTP error status and the promise rejects with `"Error: <status>"`. The app catches this error but does not automatically clear the stale token from `localStorage`.
+</Note>

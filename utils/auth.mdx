@@ -1,0 +1,144 @@
+---
+title: "Auth utility — register() and authorize() functions"
+description: "The auth.jsx module exports register() and authorize(), which POST to the nomoreparties API to create accounts and authenticate users, returning JWTs."
+---
+
+`auth.jsx` handles the two unauthenticated entry points into the Cryptoducks app: creating a new account and signing in with an existing one. `register` is called when a user submits the registration form, and `authorize` is called when a user submits the login form. On a successful login, `authorize` returns a JWT that the app stores in `localStorage` to maintain the session.
+
+## BASE_URL
+
+All requests in this module are relative to the shared base URL:
+
+```
+https://api.nomoreparties.co
+```
+
+## register(username, password, email)
+
+Creates a new user account by posting the user's credentials to the registration endpoint.
+
+```jsx auth.jsx
+export const BASE_URL = "https://api.nomoreparties.co";
+
+export const register = (username, password, email) => {
+  return fetch(`${BASE_URL}/auth/local/register`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username, password, email }),
+  })
+    .then((res) => {
+      return res.ok ? res.json() : Promise.reject(`Error: ${res.status}`);
+    })
+};
+```
+
+**Endpoint:** `POST /auth/local/register`
+
+### Parameters
+
+<ParamField path="username" type="string" required>
+  The display name the user wants to register with.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  The user's chosen password.
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  The user's email address.
+</ParamField>
+
+### Returns
+
+A `Promise` that resolves to the server's JSON response on success, or rejects with the string `"Error: <status>"` on a non-`2xx` response. A successful registration does **not** return a JWT — the user must call `authorize` separately to obtain one.
+
+## authorize(identifier, password)
+
+Authenticates an existing user and returns a JWT for the session.
+
+```jsx auth.jsx
+export const authorize = (identifier, password) => {
+  return fetch(`${BASE_URL}/auth/local`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ identifier, password }),
+  }).then((res) => {
+    return res.ok ? res.json() : Promise.reject(`Error: ${res.status}`);
+  })
+};
+```
+
+**Endpoint:** `POST /auth/local`
+
+### Parameters
+
+<ParamField path="identifier" type="string" required>
+  The user's username or email address. The login endpoint uses the field name `identifier`, not `username`.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  The user's password.
+</ParamField>
+
+### Returns
+
+A `Promise` that resolves to `{ jwt, user }` on success, or rejects with `"Error: <status>"` on failure.
+
+| Field  | Type   | Description                              |
+| ------ | ------ | ---------------------------------------- |
+| `jwt`  | string | The session token to store and reuse.    |
+| `user` | object | The authenticated user's profile data.  |
+
+<Note>
+  The login endpoint (`POST /auth/local`) expects the field name `identifier`, not `username`. The registration endpoint (`POST /auth/local/register`) expects `username`. Passing the wrong field name to `authorize` will cause the server to reject the request.
+</Note>
+
+## Usage in App.jsx
+
+`handleRegistration` calls `register` after validating that both password fields match, then redirects to `/login` on success:
+
+```jsx App.jsx
+const handleRegistration = ({
+  username,
+  email,
+  password,
+  confirmPassword,
+}) => {
+  if (password === confirmPassword) {
+    auth
+      .register(username, password, email)
+      .then(() => {
+        console.log("El proceso de registro fue exitoso");
+        navigate("/login");
+      })
+      .catch(console.error);
+  }
+};
+```
+
+`handleLogin` calls `authorize`, and on a successful response stores the JWT, updates user state, and navigates to the protected `/ducks` route:
+
+```jsx App.jsx
+const handleLogin = ({ username, password }) => {
+  if (!username || !password) {
+    return;
+  }
+  auth
+    .authorize(username, password)
+    .then((data) => {
+      if (data.jwt) {
+        setToken(data.jwt);   // guardar el token en el localStorage
+        setUserData(data.user);  // guardar los datos de usuario en el estado
+        setIsLoggedIn(true);     // inicia la sesión del usuario
+        navigate("/ducks");      // enviarlo a /ducks
+      }
+    })
+    .catch(console.error);
+};
+```

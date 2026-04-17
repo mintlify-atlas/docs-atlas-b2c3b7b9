@@ -1,0 +1,83 @@
+---
+title: "JWT lifecycle — storage, restoration, and sign-out"
+description: "Cryptoducks persists the JWT in localStorage using three utility functions: setToken, getToken, and removeToken — keyed under 'jwt'."
+---
+
+Rather than scattering `localStorage` calls throughout the codebase, Cryptoducks centralises all token reads and writes in `src/utils/token.jsx`. The file exports three functions and one private constant. Any component or utility that needs to interact with the stored JWT imports exactly the function it needs — nothing more.
+
+## Full source
+
+```jsx src/utils/token.jsx
+const TOKEN_KEY = "jwt";
+
+export const setToken = (token) =>
+    localStorage.setItem(TOKEN_KEY, token);
+
+export const getToken = () => {
+    return localStorage.getItem(TOKEN_KEY);
+};
+
+export const removeToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+};
+```
+
+## Functions
+
+| Function | Description |
+|---|---|
+| `setToken(token)` | Writes `token` to `localStorage` under the key `"jwt"`. Called immediately after a successful login. |
+| `getToken()` | Reads the value stored under `"jwt"`. Returns `null` if the key does not exist (i.e. the user has never logged in or has signed out). |
+| `removeToken()` | Deletes the `"jwt"` key from `localStorage`. Called on sign-out. |
+
+## The `TOKEN_KEY` constant
+
+The string `"jwt"` is defined once as `TOKEN_KEY` and used by all three functions. Centralising the key name means that if you ever need to rename the storage key, you change one line instead of hunting across files.
+
+## Sign-out: `NavBar` calls `removeToken()`
+
+The `NavBar` component handles sign-out. Its `signOut` function removes the token, updates React state, and navigates the user back to `/login`.
+
+```jsx src/components/NavBar.jsx
+function NavBar({ setIsLoggedIn }) {
+  const navigate = useNavigate();
+
+  function signOut() {
+    removeToken();
+    setIsLoggedIn(false);
+    navigate("/login");
+  }
+
+  // ... JSX
+}
+```
+
+The order matters: `removeToken()` runs first so the token is gone before any navigation occurs. `setIsLoggedIn(false)` then causes all `ProtectedRoute` wrappers to re-evaluate, blocking access to authenticated routes before the browser navigates away.
+
+## Session restoration on mount
+
+`App.jsx` imports `getToken` and calls it inside a `useEffect` with an empty dependency array. This runs once when the app first loads:
+
+```jsx src/components/App.jsx
+useEffect(() => {
+  const jwt = getToken();
+
+  if (!jwt) {
+    return;
+  }
+
+  api
+    .getUserInfo(jwt)
+    .then(({ username, email }) => {
+      setIsLoggedIn(true);
+      setUserData({ username, email });
+    })
+    .catch(console.error);
+}, []);
+```
+
+If `getToken()` returns `null`, the effect exits immediately and the user stays logged out. If a token exists, it is validated against `GET /users/me` before the session is restored.
+
+<Warning>
+  `localStorage` is readable by any JavaScript running on the same origin, including third-party scripts. Storing a JWT there is acceptable for a learning project, but production applications should evaluate `httpOnly` cookies as an alternative — these are invisible to JavaScript entirely and are not vulnerable to XSS-based token theft.
+</Warning>

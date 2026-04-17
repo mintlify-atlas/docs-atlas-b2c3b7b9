@@ -1,0 +1,110 @@
+---
+title: "Guarding routes with ProtectedRoute in React Router"
+description: "ProtectedRoute is a React Router v6 wrapper component that redirects unauthenticated users to /login and logged-in users away from anonymous-only pages."
+---
+
+`ProtectedRoute` is a thin wrapper around React Router v6's `<Navigate>` component. It reads `isLoggedIn` from props and decides whether to render its children or redirect the user. The same component handles two opposite cases: protecting authenticated content from anonymous visitors, and keeping already-logged-in users away from pages like `/login` and `/register` that exist only for unauthenticated sessions.
+
+## Component source
+
+```jsx src/components/ProtectedRoute.jsx
+import { Navigate, useLocation } from "react-router-dom";
+
+export default function ProtectedRoute({ isLoggedIn, children, anonymous = false }) {
+  const location = useLocation();
+  const from = location.state?.from || "/";
+
+  if (anonymous && isLoggedIn) {
+    return <Navigate to={from} />;
+  }
+
+  if (!anonymous && !isLoggedIn) {
+    return <Navigate to="/login" state={{ from: location }} />;
+  }
+
+  return children;
+}
+```
+
+## Props
+
+<ParamField path="isLoggedIn" type="boolean" required>
+  The current authentication state, passed down from `App.jsx`. When `true`, the user has a valid JWT and an active session.
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  The page or component to render when the auth conditions are met.
+</ParamField>
+
+<ParamField path="anonymous" type="boolean" default="false">
+  When `true`, the route is intended for unauthenticated users only (e.g. `/login`, `/register`). A logged-in user visiting an anonymous route is redirected away.
+</ParamField>
+
+## Behavior
+
+| `anonymous` | `isLoggedIn` | Outcome |
+|---|---|---|
+| `false` | `false` | Redirect to `/login`, passing current location in `state.from` |
+| `false` | `true` | Render `children` |
+| `true` | `true` | Redirect to `location.state.from` or `/` |
+| `true` | `false` | Render `children` |
+
+## Usage in App.jsx
+
+`App.jsx` wraps every route with `ProtectedRoute`. Protected pages pass only `isLoggedIn`; anonymous pages also pass the `anonymous` prop.
+
+```jsx src/components/App.jsx
+<Routes>
+  {/* Authenticated routes */}
+  <Route
+    path="/ducks"
+    element={
+      <ProtectedRoute isLoggedIn={isLoggedIn}>
+        <Ducks setIsLoggedIn={setIsLoggedIn}/>
+      </ProtectedRoute>
+    }
+  />
+  <Route
+    path="/my-profile"
+    element={
+      <ProtectedRoute isLoggedIn={isLoggedIn}>
+        <MyProfile userData={userData} setIsLoggedIn={setIsLoggedIn}/>
+      </ProtectedRoute>
+    }
+  />
+
+  {/* Anonymous-only routes */}
+  <Route
+    path="/login"
+    element={
+      <ProtectedRoute isLoggedIn={isLoggedIn} anonymous>
+        <div className="loginContainer">
+          <Login handleLogin={handleLogin} />
+        </div>
+      </ProtectedRoute>
+    }
+  />
+  <Route
+    path="/register"
+    element={
+      <ProtectedRoute isLoggedIn={isLoggedIn} anonymous>
+        <div className="registerContainer">
+          <Register handleRegistration={handleRegistration} />
+        </div>
+      </ProtectedRoute>
+    }
+  />
+
+  {/* Catch-all */}
+  <Route
+    path="*"
+    element={
+      isLoggedIn ? <Navigate to="/ducks" /> : <Navigate to="/login" />
+    }
+  />
+</Routes>
+```
+
+<Note>
+  When an unauthenticated user is redirected to `/login`, `ProtectedRoute` passes the current location object in router state as `state={{ from: location }}`. After a successful login, the app can read `location.state?.from` to navigate the user back to the page they originally tried to visit. The `ProtectedRoute` anonymous branch uses this same value: `const from = location.state?.from || "/"`.
+</Note>

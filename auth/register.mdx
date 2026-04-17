@@ -1,0 +1,103 @@
+---
+title: "User registration flow — POST /auth/local/register"
+description: "How Cryptoducks registers new users: the Register component collects username, email, and password, then calls POST /auth/local/register."
+---
+
+When a new user submits the registration form, Cryptoducks sends their credentials to the backend, waits for a successful response, and then redirects them to `/login` to authenticate. The password is never stored client-side — the browser sends it once over HTTPS and discards it. A client-side confirmation check ensures the user typed their intended password before any network request is made.
+
+## The `register()` function
+
+`register()` lives in `src/utils/auth.jsx` and is the only function responsible for creating new accounts. It performs a single `POST` request and delegates all error handling to the caller via a rejected promise.
+
+```jsx src/utils/auth.jsx
+export const BASE_URL = "https://api.nomoreparties.co";
+
+export const register = (username, password, email) => {
+  return fetch(`${BASE_URL}/auth/local/register`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username, password, email }),
+  })
+    .then((res) => {
+      return res.ok ? res.json() : Promise.reject(`Error: ${res.status}`);
+    })
+};
+```
+
+## Request parameters
+
+<ParamField body="username" type="string" required>
+  The user's chosen display name. Sent as part of the JSON request body.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password. Sent as part of the JSON request body and never cached client-side.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  The user's email address. Sent as part of the JSON request body.
+</ParamField>
+
+## Password confirmation check
+
+Before calling `register()`, `App.jsx` verifies that the user typed the same password in both fields. If the values do not match, the function returns early without making a network request.
+
+```jsx src/components/App.jsx
+const handleRegistration = ({
+  username,
+  email,
+  password,
+  confirmPassword,
+}) => {
+  if (password === confirmPassword) {
+    auth
+      .register(username, password, email)
+      .then(() => {
+        console.log("El proceso de registro fue exitoso");
+        navigate("/login");
+      })
+      .catch(console.error);
+  }
+};
+```
+
+## On success
+
+When `register()` resolves, `handleRegistration` calls `navigate("/login")` to send the user to the login page. No token is issued at registration time — the user must log in separately to receive a JWT.
+
+## The `Register` component
+
+The `Register` component in `src/components/Register.jsx` manages local form state for four fields — `username`, `email`, `password`, and `confirmPassword` — and calls `handleRegistration` on submit.
+
+```jsx src/components/Register.jsx
+const Register = ({handleRegistration}) => {
+  const [data, setData] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    handleRegistration(data);
+  };
+
+  // ... form JSX
+};
+```
+
+<Note>
+  If the API returns a non-`2xx` status code, `register()` calls `Promise.reject()` with a string in the format `"Error: <status>"` — for example, `"Error: 400"`. The calling code in `App.jsx` forwards this to `console.error`. In a production app you would surface this error to the user in the UI.
+</Note>

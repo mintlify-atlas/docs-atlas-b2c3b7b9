@@ -1,0 +1,124 @@
+---
+title: "App component — auth state, handlers, and routes"
+description: "App.jsx owns isLoggedIn and userData state, provides handleLogin and handleRegistration handlers, and wires all React Router v6 routes via ProtectedRoute."
+---
+
+`App.jsx` is the root component of Cryptoducks. It is the single source of truth for authentication state — it owns `isLoggedIn` and `userData`, defines the handlers that mutate them, and composes every React Router v6 route. All child components that need to read or update auth state receive what they need through props rather than a context or global store, keeping the data flow explicit and easy to trace.
+
+## State
+
+<ParamField path="userData" type="object" default='{ username: "", email: "" }'>
+  The authenticated user's profile data. Shape: `{ username: string, email: string }`. Initialized to empty strings and populated after a successful login or session restoration.
+</ParamField>
+
+<ParamField path="isLoggedIn" type="boolean" default="false">
+  Tracks whether a valid session is active. Passed to every `ProtectedRoute` to decide whether to render the protected page or redirect.
+</ParamField>
+
+## Handlers
+
+### `handleLogin`
+
+Accepts `{ username, password }` from the `Login` form. Returns early if either field is empty, then calls `auth.authorize(username, password)`. On success, the response contains `{ jwt, user }` — the JWT is persisted to `localStorage` via `setToken()`, `userData` and `isLoggedIn` are updated, and the user is navigated to `/ducks`.
+
+### `handleRegistration`
+
+Accepts `{ username, email, password, confirmPassword }` from the `Register` form. Compares `password` and `confirmPassword` before proceeding. If they match, calls `auth.register(username, password, email)` and navigates to `/login` on success. If they differ, the handler exits silently without making a network request.
+
+## Session restoration
+
+A `useEffect` with an empty dependency array runs once on mount. It calls `getToken()` to read any JWT stored in `localStorage`. If no token is found it returns immediately, leaving the user unauthenticated. If a token exists, it calls `api.getUserInfo(jwt)` against `GET /users/me`. A successful response sets `isLoggedIn` to `true` and populates `userData`, restoring the session without requiring the user to log in again.
+
+```jsx
+useEffect(() => {
+  const jwt = getToken();
+
+  if (!jwt) {
+    return;
+  }
+
+  api
+    .getUserInfo(jwt)
+    .then(({ username, email }) => {
+      setIsLoggedIn(true);
+      setUserData({ username, email });
+    })
+    .catch(console.error);
+}, []);
+```
+
+## Routes
+
+| Path | Component | Access | Props passed |
+|------|-----------|--------|--------------|
+| `/ducks` | `Ducks` | Authenticated | `setIsLoggedIn` |
+| `/my-profile` | `MyProfile` | Authenticated | `userData`, `setIsLoggedIn` |
+| `/login` | `Login` | Anonymous only | `handleLogin` |
+| `/register` | `Register` | Anonymous only | `handleRegistration` |
+| `*` | `Navigate` | Any | Redirects to `/ducks` or `/login` |
+
+<Note>
+  The `/login` and `/register` routes use `ProtectedRoute` with the `anonymous` prop. This redirects already-authenticated users away from those pages — they cannot visit the login form while logged in.
+</Note>
+
+## Full route tree
+
+```jsx App.jsx
+return (
+  <Routes>
+    {/* Envuelve Ducks en ProtectedRoute y pasa isLoggedIn como propiedad. */}
+    <Route
+      path="/ducks"
+      element={
+        <ProtectedRoute isLoggedIn={isLoggedIn}>
+          <Ducks setIsLoggedIn={setIsLoggedIn}/>
+        </ProtectedRoute>
+      }
+    />
+    {/* Envuelve MyProfile en ProtectedRoute y pasa isLoggedIn como propiedad. */}
+    <Route
+      path="/my-profile"
+      element={
+        <ProtectedRoute isLoggedIn={isLoggedIn}>
+          <MyProfile userData={userData} setIsLoggedIn={setIsLoggedIn}/>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/login"
+      element={
+        <ProtectedRoute isLoggedIn={isLoggedIn} anonymous>
+          <div className="loginContainer">
+            <Login handleLogin={handleLogin} />
+          </div>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/register"
+      element={
+        <ProtectedRoute isLoggedIn={isLoggedIn} anonymous>
+          <div className="registerContainer">
+            <Register handleRegistration={handleRegistration} />
+          </div>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="*"
+      element={
+        isLoggedIn ? <Navigate to="/ducks" /> : <Navigate to="/login" />
+      }
+    />
+  </Routes>
+);
+```
+
+<CardGroup cols={2}>
+  <Card title="ProtectedRoute" icon="shield-halved" href="/auth/protected-routes">
+    How the route guard decides to render or redirect
+  </Card>
+  <Card title="Auth utilities" icon="key" href="/utils/auth">
+    The `authorize()` and `register()` functions called by App's handlers
+  </Card>
+</CardGroup>

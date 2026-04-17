@@ -1,0 +1,93 @@
+---
+title: "User login and JWT session storage — POST /auth/local"
+description: "How Cryptoducks authenticates users: the authorize() function calls POST /auth/local and stores the returned JWT in localStorage for session persistence."
+---
+
+Login in Cryptoducks is a two-step process: the app sends credentials to the API and receives a JWT, then stores that token so the session survives page reloads. The `authorize()` utility function handles the network request; the `handleLogin` function in `App.jsx` wires the response to application state. A `useEffect` hook runs once on mount to restore any existing session without requiring the user to log in again.
+
+## The `authorize()` function
+
+`authorize()` lives in `src/utils/auth.jsx`. It sends a `POST` request to `/auth/local` and returns the parsed JSON response — which includes both a `jwt` token and a `user` object.
+
+```jsx src/utils/auth.jsx
+export const authorize = (identifier, password) => {
+  return fetch(`${BASE_URL}/auth/local`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ identifier, password }),
+  }).then((res) => {
+    return res.ok ? res.json() : Promise.reject(`Error: ${res.status}`);
+  })
+};
+```
+
+## Request parameters
+
+<ParamField body="identifier" type="string" required>
+  The user's username. The API field is named `identifier` rather than `username` to match the Strapi authentication convention.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password.
+</ParamField>
+
+## Successful response
+
+A successful login returns `{ jwt, user }`. The `handleLogin` function in `App.jsx` checks for `data.jwt` before trusting the response, then updates three pieces of state:
+
+```jsx src/components/App.jsx
+const handleLogin = ({ username, password }) => {
+  if(!username || !password) {
+    return;
+  }
+  auth
+    .authorize(username, password)
+    .then((data) => {
+      if (data.jwt) {
+        setToken(data.jwt);   // guardar el token en el localStorage
+        setUserData(data.user);  // guardar los datos de usuario en el estado
+        setIsLoggedIn(true);     // inicia la sesión del usuario
+        navigate("/ducks");      // enviarlo a /ducks
+      }
+    })
+    .catch(console.error);
+};
+```
+
+| Action | What it does |
+|---|---|
+| `setToken(data.jwt)` | Writes the JWT to `localStorage` under the key `"jwt"` for session persistence |
+| `setUserData(data.user)` | Stores the user object (username, email) in React state |
+| `setIsLoggedIn(true)` | Unlocks all protected routes |
+| `navigate("/ducks")` | Redirects the user to the main content page |
+
+## Session restoration on page load
+
+When the app mounts, a `useEffect` with an empty dependency array runs once. It reads any stored JWT from `localStorage` and validates it against `GET /users/me`. If the token is still valid, the user is logged in silently without visiting the login page.
+
+```jsx src/components/App.jsx
+useEffect(() => {
+  const jwt = getToken();
+
+  if (!jwt) {
+    return;
+  }
+
+  api
+    .getUserInfo(jwt)
+    .then(({ username, email }) => {
+      // si la respuesta es exitosa, inicia la sesión del usuario, guarda sus
+      // datos en el estado y lo dirige a /ducks.
+      setIsLoggedIn(true);
+      setUserData({ username, email });
+    })
+    .catch(console.error);
+}, []);
+```
+
+<Tip>
+  If either `username` or `password` is an empty string, `handleLogin` returns immediately before calling `authorize()`. This prevents sending a request with blank credentials but does not show any validation message to the user — the form fields carry the `required` HTML attribute, which provides native browser validation before `handleSubmit` is ever called.
+</Tip>

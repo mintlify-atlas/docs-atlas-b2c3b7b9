@@ -1,0 +1,86 @@
+---
+title: "NavBar component — navigation links and sign-out"
+description: "NavBar renders the top navigation with links to /ducks and /my-profile, and a sign-out button that clears the JWT and resets auth state."
+---
+
+`NavBar` appears at the top of every protected page in Cryptoducks. It gives authenticated users a consistent way to move between the duck catalog and their profile, and provides the sign-out action that ends their session. Because it needs to update `isLoggedIn` on sign-out, it receives `setIsLoggedIn` directly from `App` via the page component that renders it.
+
+## Props
+
+<ParamField path="setIsLoggedIn" type="function" required>
+  The state setter from `App`'s `isLoggedIn` state. Called with `false` when the user signs out, which triggers a re-render of the route tree and redirects the user to `/login`.
+</ParamField>
+
+## The `signOut` function
+
+When the user clicks **Cerrar sesión**, `signOut` runs three steps in order:
+
+1. Calls `removeToken()` to delete the JWT from `localStorage`
+2. Calls `setIsLoggedIn(false)` to clear the auth flag in App's state
+3. Calls `navigate("/login")` to send the user to the login page
+
+The JWT is removed first so that if navigation or the state update were interrupted, there is no stale token left that could be mistaken for a valid session.
+
+## Navigation links
+
+| Label | Path |
+|-------|------|
+| Patos | `/ducks` |
+| Mi perfil | `/my-profile` |
+
+<Tip>
+  `NavLink` from React Router v6 automatically adds an `active` CSS class to the link whose `to` prop matches the current URL. NavBar applies the `navbar__link` class to all links; the `active` class is added on top of it, letting you style the current page's link differently with `.navbar__link.active` in `NavBar.css`.
+</Tip>
+
+## Component source
+
+```jsx NavBar.jsx
+import { NavLink, useNavigate } from "react-router-dom";
+import { removeToken } from "../utils/token";
+import Logo from "./Logo";
+import "./styles/NavBar.css";
+
+function NavBar({ setIsLoggedIn }) {
+  const navigate = useNavigate();
+
+  function signOut() {
+    removeToken();
+    setIsLoggedIn(false);
+    navigate("/login");
+  }
+
+  return (
+    <div className="navbar">
+      <div className="navbar__logo">
+        <Logo />
+      </div>
+      <ul className="navbar__nav">
+        <li>
+          <NavLink to="/ducks" className="navbar__link">
+            Patos
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/my-profile" className="navbar__link">
+            Mi perfil
+          </NavLink>
+        </li>
+        <li>
+          <button onClick={signOut} className="navbar__link navbar__button">Cerrar sesión</button>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+export default NavBar;
+```
+
+<CardGroup cols={2}>
+  <Card title="Token utilities" icon="key" href="/utils/token">
+    The `removeToken()` function called during sign-out
+  </Card>
+  <Card title="App component" icon="house" href="/components/app">
+    Where `setIsLoggedIn` originates and how it connects to routing
+  </Card>
+</CardGroup>

@@ -1,0 +1,90 @@
+---
+title: "Token utility — setToken, getToken, removeToken()"
+description: "token.jsx exports three functions — setToken, getToken, and removeToken — that manage the JWT in localStorage under the key 'jwt'."
+---
+
+`token.jsx` centralizes all reads and writes to `localStorage` for the Cryptoducks session token. Rather than scattering raw `localStorage` calls across the codebase, `App` and its children import the three helpers from this module. The token is stored under the fixed key `"jwt"` and represents the user's authenticated session — its presence (or absence) determines whether the app treats the user as logged in on the next page load.
+
+## TOKEN_KEY
+
+All three functions use the same storage key internally:
+
+```jsx
+const TOKEN_KEY = "jwt";
+```
+
+## Source
+
+```jsx token.jsx
+const TOKEN_KEY = "jwt";
+
+export const setToken = (token) =>
+    localStorage.setItem(TOKEN_KEY, token);
+
+export const getToken = () => {
+    return localStorage.getItem(TOKEN_KEY);
+};
+
+export const removeToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+};
+```
+
+## Functions
+
+### setToken(token)
+
+Persists the JWT to `localStorage` so it survives page reloads.
+
+<ParamField path="token" type="string" required>
+  The JWT string returned by `authorize()`. Stored under the key `"jwt"`.
+</ParamField>
+
+Calls `localStorage.setItem("jwt", token)` internally. `setToken` is called in `handleLogin` immediately after `authorize` resolves with a valid `data.jwt`:
+
+```jsx App.jsx
+if (data.jwt) {
+  setToken(data.jwt); // guardar el token en el localStorage
+}
+```
+
+---
+
+### getToken()
+
+Retrieves the stored JWT, or `null` if no token has been set.
+
+**Returns:** `string | null` — the JWT from `localStorage`, or `null` if the key does not exist.
+
+Calls `localStorage.getItem("jwt")` internally. `getToken` is called in the `useEffect` inside `App` on mount to check for an existing session:
+
+```jsx App.jsx
+useEffect(() => {
+  const jwt = getToken();
+
+  if (!jwt) {
+    return;
+  }
+
+  api.getUserInfo(jwt).then(({ username, email }) => {
+    setIsLoggedIn(true);
+    setUserData({ username, email });
+  });
+}, []);
+```
+
+---
+
+### removeToken()
+
+Deletes the JWT from `localStorage`, effectively ending the local session.
+
+Calls `localStorage.removeItem("jwt")` internally. `removeToken` is called when the user clicks "Cerrar sesión" in the `NavBar`, clearing the stored token before navigating away from the protected routes.
+
+---
+
+<Warning>
+  Tokens stored in `localStorage` are readable by any JavaScript running on the same origin, including third-party scripts. This approach is acceptable for a learning demo but production applications should consider using `httpOnly` cookies, which are inaccessible to JavaScript and offer stronger protection against XSS attacks.
+</Warning>
+
+For the broader context of how the token fits into session management — including how it is validated on mount and cleared on sign-out — see [Token management](/auth/token-management).

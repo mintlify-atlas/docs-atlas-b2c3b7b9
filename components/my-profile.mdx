@@ -1,0 +1,92 @@
+---
+title: "MyProfile component — display authenticated user data"
+description: "MyProfile is a protected page that displays the authenticated user's username and email, received as props from App's userData state."
+---
+
+`MyProfile` is the second protected page in Cryptoducks, reachable at `/my-profile`. It gives logged-in users a place to view the account details associated with their session. Unlike `Ducks`, which displays static data, `MyProfile` renders live values from `App`'s `userData` state — data that was fetched from the backend and belongs to the currently authenticated user.
+
+## Props
+
+<ParamField path="userData" type="object" default='{ username: "Nombre de usuario aquí", email: "Correo electrónico aquí" }'>
+  The authenticated user's profile data. Shape: `{ username: string, email: string }`. Passed down from `App`'s `userData` state. Falls back to placeholder strings if the prop is not provided.
+</ParamField>
+
+<ParamField path="setIsLoggedIn" type="function" required>
+  The state setter for `App`'s `isLoggedIn` flag. Forwarded to `NavBar` so the sign-out button can end the session.
+</ParamField>
+
+## What it renders
+
+`MyProfile` renders a header labelled "Mi perfil" followed by two labelled fields:
+
+- **Nombre de usuario** — displays `userData.username`
+- **Correo electrónico** — displays `userData.email`
+
+Both values come directly from the `userData` prop destructured at the top of the component. No local state is needed.
+
+## How `userData` is populated
+
+`userData` in `App` is set in two situations:
+
+1. **After login** — `handleLogin` calls `auth.authorize(username, password)`. The response includes a `user` object, which is passed directly to `setUserData`.
+2. **On session restoration** — the `useEffect` in `App` calls `api.getUserInfo(jwt)`, which hits `GET /users/me` with a `Bearer` token. The `{ username, email }` from the response are written to `userData`.
+
+In both cases, by the time the user navigates to `/my-profile`, `userData` holds real values from the backend.
+
+## Component source
+
+```jsx MyProfile.jsx
+import NavBar from "./NavBar";
+import "./styles/MyProfile.css";
+
+// Agregamos setIsLoggedIn aquí para recibirlo desde App.jsx
+function MyProfile({
+  setIsLoggedIn,
+  userData = {
+    username: "Nombre de usuario aquí",
+    email: "Correo electrónico aquí",
+  },
+}) {
+  const { username, email } = userData;
+  
+  return (
+    <>
+      {/* Ahora podemos pasar la función correctamente al componente NavBar */}
+      <NavBar setIsLoggedIn={setIsLoggedIn} />
+      <div className="my-profile">
+        <div className="my-profile__container">
+          <div className="my-profile__header">
+            <p>Mi perfil</p>
+            <hr className="my-profile__rule" />
+          </div>
+          <div className="my-profile__info">
+            <div className="my-profile__user">
+              <p className="my-profile__key">Nombre de usuario:</p>
+              <p className="my-profile__value">{username}</p>
+            </div>
+            <div className="my-profile__user">
+              <p className="my-profile__key">Correo electrónico:</p>
+              <p className="my-profile__value">{email}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default MyProfile;
+```
+
+<Note>
+  The default prop values `"Nombre de usuario aquí"` and `"Correo electrónico aquí"` are placeholders shown if `userData` is not passed. In normal usage, `App` always provides the prop — these strings act as a safety net during development or if a render occurs before the API response returns.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="App component" icon="house" href="/components/app">
+    Where `userData` is fetched, stored, and passed as a prop
+  </Card>
+  <Card title="API utilities" icon="plug" href="/utils/api">
+    The `getUserInfo()` function that populates `userData`
+  </Card>
+</CardGroup>

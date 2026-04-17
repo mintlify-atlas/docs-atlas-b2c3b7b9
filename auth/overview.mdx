@@ -1,0 +1,46 @@
+---
+title: "How authentication and authorization work in Cryptoducks"
+description: "Cryptoducks uses JWT tokens and React Router v6 protected routes to control access. Learn how registration, login, and route guarding work together."
+---
+
+Cryptoducks gates all duck content behind a JWT-based authentication layer. When you visit the app, your browser checks `localStorage` for an existing token and silently validates it against the API. If no valid token is found, every protected route redirects you to `/login`. Once authenticated, your token persists across page reloads until you explicitly sign out — at which point the token is erased and you are returned to `/login`.
+
+## Full authentication flow
+
+<Steps>
+  <Step title="Register a new account">
+    The `Register` component collects a username, email, and password, then sends a `POST` request to `/auth/local/register`. On success, the app navigates to `/login`.
+  </Step>
+  <Step title="Log in and receive a JWT">
+    The `Login` component submits credentials to `POST /auth/local`. The API responds with `{ jwt, user }`. The app stores the token with `setToken(data.jwt)` and sets `isLoggedIn` to `true`.
+  </Step>
+  <Step title="Token persisted to localStorage">
+    `setToken()` writes the JWT to `localStorage` under the key `"jwt"`. The token survives page reloads without requiring the user to log in again.
+  </Step>
+  <Step title="Session restored on page load">
+    A `useEffect` in `App.jsx` runs once on mount. It calls `getToken()` to read any stored JWT, then calls `GET /users/me` to verify it. If valid, `isLoggedIn` is set to `true` and `userData` is populated.
+  </Step>
+  <Step title="Protected routes enforce auth state">
+    Every route is wrapped in `ProtectedRoute`. Routes that require authentication redirect unauthenticated users to `/login`. Routes for unauthenticated users (login, register) redirect already-logged-in users away.
+  </Step>
+  <Step title="Sign out clears the token">
+    The `NavBar` component calls `removeToken()` to delete the JWT from `localStorage`, sets `isLoggedIn` to `false`, and navigates back to `/login`.
+  </Step>
+</Steps>
+
+## Explore the auth system
+
+<CardGroup cols={2}>
+  <Card title="User registration" icon="user-plus" href="/auth/register">
+    How the `Register` component and `register()` utility function create new accounts via `POST /auth/local/register`.
+  </Card>
+  <Card title="Login and JWT handling" icon="key" href="/auth/login">
+    How `authorize()` authenticates users, stores the JWT, and restores sessions on page load.
+  </Card>
+  <Card title="Protected routes" icon="shield" href="/auth/protected-routes">
+    How `ProtectedRoute` wraps routes to redirect unauthenticated and authenticated users appropriately.
+  </Card>
+  <Card title="Token management" icon="database" href="/auth/token-management">
+    The three `localStorage` utility functions — `setToken`, `getToken`, and `removeToken` — that manage the JWT lifecycle.
+  </Card>
+</CardGroup>

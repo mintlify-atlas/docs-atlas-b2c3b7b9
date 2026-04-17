@@ -1,0 +1,72 @@
+{
+  "projectType": "frontend",
+  "projectName": "Cryptoducks",
+  "projectDescription": "A React + Vite demo application built for a Spanish-language web development bootcamp that demonstrates frontend authentication and authorization patterns including JWT login/registration, protected routes, and localStorage token management.",
+  "theme": "palm",
+  "primaryColor": "#2E86AB",
+  "lightColor": "#A8DADC",
+  "darkColor": "#1A5276",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Authentication & Authorization",
+            "pages": [
+              "auth/overview",
+              "auth/register",
+              "auth/login",
+              "auth/protected-routes",
+              "auth/token-management"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "components/app",
+              "components/navbar",
+              "components/ducks",
+              "components/my-profile"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "utils/api",
+              "utils/auth",
+              "utils/token"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT-based user authentication with login and registration flows",
+    "Protected routes using a reusable ProtectedRoute component",
+    "localStorage-based token persistence across page reloads",
+    "Anonymous route guards that redirect authenticated users away from login/register",
+    "React Router v6 navigation with programmatic redirects",
+    "User profile display with data fetched from a REST API",
+    "Modular utility functions for auth and API interactions"
+  ],
+  "publicApiSurface": [
+    "auth.register(username, password, email) — POST /auth/local/register",
+    "auth.authorize(identifier, password) — POST /auth/local",
+    "api.getUserInfo(token) — GET /users/me",
+    "token.setToken(token) — saves JWT to localStorage",
+    "token.getToken() — retrieves JWT from localStorage",
+    "token.removeToken() — removes JWT from localStorage",
+    "ProtectedRoute({ isLoggedIn, children, anonymous }) — route guard component",
+    "App handleLogin({ username, password }) — login handler",
+    "App handleRegistration({ username, email, password, confirmPassword }) — registration handler"
+  ]
+}

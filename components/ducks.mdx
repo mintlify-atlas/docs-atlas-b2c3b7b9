@@ -1,0 +1,79 @@
+---
+title: "Ducks, DuckList, and DuckCard — protected catalog"
+description: "The Ducks page renders the protected cryptoduck catalog. DuckList maps static duck data to DuckCard components — visible only to authenticated users."
+---
+
+The `Ducks` component is the main protected page of Cryptoducks. It serves as the first destination after a successful login and displays the full catalog of cryptoducks. `Ducks` itself is a thin coordinator — it renders the navigation bar and delegates all catalog rendering to `DuckList`, which in turn delegates individual card rendering to `DuckCard`.
+
+## Component hierarchy
+
+```
+Ducks
+├── NavBar          (navigation and sign-out)
+└── DuckList        (catalog container)
+    └── DuckCard    (individual duck entry, one per duck)
+```
+
+## `Ducks` props
+
+<ParamField path="setIsLoggedIn" type="function" required>
+  Passed straight through to `NavBar` so the sign-out button can clear auth state in `App`. `Ducks` does not use this value itself.
+</ParamField>
+
+## `DuckList`
+
+`DuckList` has no props. It imports the `ducks` array directly from `src/utils/data.js` and maps each entry to a `DuckCard`, passing the duck object as a `duck` prop and the duck's `id` as the React `key`.
+
+## Duck data structure
+
+Each entry in the `ducks` array exported from `data.js` has the following shape:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `number` | Unique identifier used as the React list key |
+| `name` | `string` | Display name of the duck (e.g. `"Pato Perro"`) |
+| `description` | `string` | Eyewitness account or description of the duck |
+| `img` | `string` | Absolute URL to the duck image, resolved at build time via `new URL("../assets/images/...", import.meta.url).href` |
+
+<Note>
+  The `img` URL is resolved using `import.meta.url` so Vite processes the image as a module asset and includes it in the production build with the correct hashed filename.
+</Note>
+
+## The four ducks
+
+| Name | Origin |
+|------|--------|
+| **Pato Perro** | Spotted across central Europe; reportedly fond of old socks |
+| **Pato Cebra** | Sighted in central Africa; best observed under a full moon |
+| **Pato Jirafa** | One of the tallest cryptoducks on record; first encountered in New Jersey, 1962 |
+| **Pato OVNI** | Widely sighted worldwide; motivations remain unknown |
+
+## `DuckList` source
+
+```jsx DuckList.jsx
+import DuckCard from "./DuckCard";
+import data from "../utils/data";
+import "./styles/DuckList.css";
+
+function DuckList() {
+  const { ducks } = data;
+  return (
+    <div className="duck-list">
+      {ducks.map((duck) => {
+        return <DuckCard duck={duck} key={duck.id} />;
+      })}
+    </div>
+  );
+}
+
+export default DuckList;
+```
+
+<CardGroup cols={2}>
+  <Card title="App component" icon="house" href="/components/app">
+    How `Ducks` is wrapped in `ProtectedRoute` and receives its props
+  </Card>
+  <Card title="MyProfile" icon="user" href="/components/my-profile">
+    The other protected page rendered after login
+  </Card>
+</CardGroup>
